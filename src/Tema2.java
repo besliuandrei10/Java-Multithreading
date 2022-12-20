@@ -17,32 +17,32 @@ class ReaderThread extends Thread {
         try {
             String line = reader.readLine();
             while (line != null) {
-                System.out.println("Thread " + id + " processing order " + line);
-
-                // Send Tasks to Pool
+                // Parse line for variables.
                 String[] splitLine = line.split(",");
                 String order = splitLine[0];
                 int numberOfProducts = Integer.parseInt(splitLine[1]);
 
+                // Check if order is empty, move on if so.
                 if(numberOfProducts == 0) {
                     line = reader.readLine();
                     continue;
                 }
 
+                // Create Tasks in Task Pool.
                 ArrayList<Future<Boolean>> list = new ArrayList<>();
                 for(int i = 1; i <= numberOfProducts; i++) {
                     list.add(tpe.submit(new Task(order, i)));
                 }
 
+                // Presume Order has been shipped, check shipped products.
                 boolean status = true;
-
                 for (Future<Boolean> element : list) {
                     if (!element.get()) {
                         status = false;
                     }
                 }
 
-                // Await answers and write to file.
+                // Await answer and write to file.
                 if(status) {
                     synchronized (Tema2.readerMutex) {
                         Tema2.output.write(line + ",shipped\n");
@@ -70,15 +70,18 @@ class Task implements Callable {
     }
     @Override
     public Boolean call() throws IOException {
+        // Open products file for reading.
         String readPath = Tema2.folderPath + "/order_products.txt";
         BufferedReader read = new BufferedReader(new FileReader(readPath));
-        int count = 0;
 
+        int count = 0;
         String line = read.readLine();
         while (line != null) {
+            // Split line in order to extract variables.
             String[] splitLine = line.split(",");
 
             if (order.equals(splitLine[0])) count++;
+            // If we found the specified product, write to file and exit.
             if (count == productNumber) {
                 synchronized (Tema2.writerMutex) {
                     Tema2.outputProducts.write(line + ",shipped\n");
@@ -104,6 +107,7 @@ public class Tema2 {
             return;
         }
 
+        // Folder Path visible for all the other Threads.
         folderPath = args[0];
 
         // Input Files and Reader
@@ -111,7 +115,6 @@ public class Tema2 {
         BufferedReader reader = new BufferedReader(new FileReader(input));
 
         // Output Files
-
         output = new BufferedWriter(new FileWriter("orders_out.txt"));
         outputProducts = new BufferedWriter(new FileWriter("order_products_out.txt"));
 
@@ -136,6 +139,8 @@ public class Tema2 {
 
         // Close Worker Pool
         tpe.shutdown();
+
+        // Close files.
         output.close();
         outputProducts.close();
     }
